@@ -2,29 +2,61 @@ import tkinter as tk
 from tkinter import simpledialog, messagebox
 from datetime import datetime
 import sqlite3
+from PIL import Image, ImageTk
+
 
 
 class BookingApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Soccer Field Booking")
+
+        #By changing it to true it will display on fullscreen, Having it turned to False will add Maximize and Minimize
+        self.root.attributes('-fullscreen', False)  # Start the app in fullscreen mode
+
         # Get screen width and height
         screen_width = self.root.winfo_screenwidth()
         screen_height = self.root.winfo_screenheight()
-        self.canvas = tk.Canvas(self.root, width=screen_width, height=screen_height, bg="green")
+        self.canvas = tk.Canvas(self.root, bg="green")
 
+        # Create a frame for the contact information
+        contact_frame = tk.Frame(root, bg="black")
+        contact_frame.pack(side="bottom", anchor="n", padx=0.5, pady=0.5)  # Anchored to the bottom left with padding
 
-        self.date_label = tk.Label(root, text="", font=("Helvetica", 14))
-        self.date_label.pack(pady=10)
+        # Create a label for the contact information
+        contact_label = tk.Label(contact_frame, text="For Reservations: +971505531330", font=("Helvetica", 14),
+                                 fg="white", bg="black")
+        contact_label.pack()
+
+        # Load your logo image
+        logo_image = Image.open("Asset/GreenZone.png")  # Replace with the path to your logo image
+        logo_image = logo_image.resize((240, 98))  # Adjust the size as needed
+        self.logo_photo = ImageTk.PhotoImage(logo_image)
+
+        # Create a frame for the logo
+        self.logo_frame = tk.Frame(self.root, bg="black")  # Adjust the background color as needed
+        self.logo_frame.pack(side="bottom", fill="x")  # Place it at the bottom
+
+        # Create a label to display the logo within the frame
+        self.logo_label = tk.Label(self.logo_frame, image=self.logo_photo,
+                                   bg="black")  # Match the frame's background color
+        self.logo_label.pack()
+
+        self.main_frame = tk.Frame(root)
+        self.main_frame.pack()
+
+        self.date_label = tk.Label(self.main_frame, text="", font=("Helvetica", 14), pady=10)
+        self.date_label.pack()
+
+        self.booking_slots = []  # Initialize booking_slots here
 
         self.create_booking_table()
         self.update_date_label()
 
-        self.setup_database()
-        self.load_bookings()
+        self.setup_database()  # Initialize the database
+        self.load_bookings()  # Load existing bookings from the database
 
-        self.canvas.pack()
-
+        self.canvas.pack(fill=tk.BOTH, expand=True)  # Fill the entire window with the canvas
     def setup_database(self):
         self.conn = sqlite3.connect("bookings.db")
         self.cursor = self.conn.cursor()
@@ -32,44 +64,66 @@ class BookingApp:
             "CREATE TABLE IF NOT EXISTS bookings (id INTEGER PRIMARY KEY, field INTEGER, hour TEXT, date TEXT, name TEXT)")
         self.conn.commit()
 
+
     def create_booking_table(self):
-        self.canvas = tk.Canvas(self.root, width=900, height=600, bg="green")
-        self.canvas.pack()
+        canvas_width = self.root.winfo_screenwidth()
+        canvas_height = self.root.winfo_screenheight()
+        self.canvas.config(width=canvas_width, height=canvas_height, bg="dark green")
+
+        start_hour = 16
+        end_hour = 26  # 1-2 AM
+        num_fields = 6  # Number of fields
+
+        slot_width = canvas_width // num_fields
+        slot_height = (canvas_height - 100) // (end_hour - start_hour + 1)  # +1 to include the last hour
 
         self.booking_slots = []
 
-        for hour in range(16, 26):  # End at 2 AM (26th hour)
-            for field in range(1, 7):
-
-
+        for hour in range(start_hour, end_hour + 1):
+            for field in range(1, num_fields + 1):
                 slot_time = f"{hour % 12 or 12}:00 {'AM' if hour < 12 else 'PM'} - {(hour + 1) % 12 or 12}:00 {'AM' if (hour + 1) % 24 < 12 else 'PM'}"
-                slot_x = (field - 1) * 150
-                slot_y = (hour - 16) * 75
-                slot_id = self.canvas.create_rectangle(slot_x, slot_y, slot_x + 150, slot_y + 75, outline="white",
-                                                       fill="green")
-
-
+                slot_x = (field - 1) * slot_width
+                slot_y = (hour - start_hour) * slot_height
+                slot_id = self.canvas.create_rectangle(slot_x, slot_y, slot_x + slot_width, slot_y + slot_height,
+                                                       outline="white", fill="dark green")
                 self.booking_slots.append(
                     {"id": slot_id, "field": field, "hour": hour, "is_booked": False, "booking_id": None})
 
-                circle_x = slot_x + 75
-                self.canvas.create_oval(circle_x - 20, slot_y + 37.5 - 20, circle_x + 20, slot_y + 37.5 + 20,
-                                        outline="white")
-                self.canvas.create_line(circle_x, slot_y, circle_x, slot_y + 75, fill="white", width=1)  # Vertical line
+                # Add a vertical line to separate fields
+                if field < num_fields+1:
+                    self.canvas.create_line(slot_x + slot_width, slot_y, slot_x + slot_width, slot_y + slot_height,
+                                            fill="black", width=10)
 
-                goal_rect_width = 20
-                self.canvas.create_rectangle(slot_x, slot_y + 27.5, slot_x + goal_rect_width, slot_y + 47.5,
-                                             outline="white")
-                self.canvas.create_rectangle(slot_x + 150 - goal_rect_width, slot_y + 27.5, slot_x + 150, slot_y + 47.5,
+                    # Add a horizontal line to separate rows
+                    if hour < end_hour +1:
+                        self.canvas.create_line(slot_x, slot_y + slot_height, slot_x + slot_width, slot_y + slot_height,
+                                                fill="black", width=10)
+
+
+
+                circle_x = slot_x + slot_width // 2
+                self.canvas.create_oval(circle_x - 20, slot_y + slot_height // 2 - 20, circle_x + 20,
+                                        slot_y + slot_height // 2 + 20, outline="white")
+                self.canvas.create_line(circle_x, slot_y, circle_x, slot_y + slot_height, fill="white",
+                                        width=1)  # Vertical line
+
+                goal_rect_width = 24
+                goal_area_height = slot_height * 0.85  # Adjust this value to make the goal area taller
+
+                self.canvas.create_rectangle(slot_x, slot_y + goal_area_height, slot_x + goal_rect_width,
+                                             slot_y + slot_height - goal_area_height, outline="white")
+                self.canvas.create_rectangle(slot_x + slot_width - goal_rect_width, slot_y + goal_area_height,
+                                             slot_x + slot_width, slot_y + slot_height - goal_area_height,
                                              outline="white")
 
-                small_square_size = 20
-                self.canvas.create_rectangle(slot_x, slot_y + 27.5, slot_x + small_square_size, slot_y + 47.5,
-                                             outline="white")
-                self.canvas.create_rectangle(slot_x + 150 - small_square_size, slot_y + 27.5, slot_x + 150,
-                                             slot_y + 47.5, outline="white")
+                small_square_size = 15
+                self.canvas.create_rectangle(slot_x, slot_y + slot_height * 0.38, slot_x + small_square_size,
+                                             slot_y + slot_height * 0.58, outline="white")
+                self.canvas.create_rectangle(slot_x + slot_width - small_square_size, slot_y + slot_height * 0.38,
+                                             slot_x + slot_width, slot_y + slot_height * 0.58, outline="white")
 
-                self.canvas.create_text(circle_x, slot_y + 37.5, text=f"Field {field}\n{slot_time}", fill="white",
+                self.canvas.create_text(circle_x, slot_y + slot_height // 2, text=f"Field {field}\n{slot_time}",
+                                        fill="white",
                                         font=("Helvetica", 9))
 
         self.canvas.bind("<Button-1>", self.canvas_clicked)
@@ -89,13 +143,13 @@ class BookingApp:
 
     def slot_clicked(self, slot):
         if not slot["is_booked"]:
-            name = simpledialog.askstring("Booking", "Enter your name:")
+            name = simpledialog.askstring("Booking", "Enter Booking Name:")
             if name:
                 self.book_slot(slot, name)
         else:
             if messagebox.askyesno("Cancel Booking", "Do you want to cancel this booking?"):
                 self.cancel_booking(slot)
-                self.canvas.itemconfig(slot["id"], fill="green")
+                self.canvas.itemconfig(slot["id"], fill="dark green")
                 slot["is_booked"] = False
 
     def book_slot(self, slot, name):
@@ -124,14 +178,18 @@ class BookingApp:
 
         if slot.get("text_id"):
             self.canvas.delete(slot["text_id"])  # Delete the associated booking name text item
+            self.canvas.dtag("name_tag_" + str(slot["id"]), slot["text_id"])  # Remove the name tag
+            slot["text_id"] = None  # Clear the association
 
         slot["is_booked"] = False
         slot["booking_id"] = None
-        slot["text_id"] = None  # Set the text_id to None to clear the association
+
+        # Add this line to explicitly refresh the canvas after canceling the booking
+        self.canvas.update()
 
     def load_bookings(self):
-        self.cursor.execute("SELECT id, field, hour, name FROM bookings WHERE date=?",
-                            (datetime.now().strftime("%Y-%m-%d"),))
+        # Function to load existing bookings from the database
+        self.cursor.execute("SELECT id, field, hour, name FROM bookings")
         booked_slots = self.cursor.fetchall()
         for booking_id, field, hour, name in booked_slots:
             slot = self.find_slot_by_field_hour(field, hour)
